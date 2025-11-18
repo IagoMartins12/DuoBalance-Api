@@ -1,0 +1,724 @@
+// Schema Prisma para My Couple Finances
+// MongoDB + Prisma + TypeScript
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USUÁRIOS E AUTENTICAÇÃO ====================
+
+model User {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  email         String   @unique
+  password      String
+  name          String
+  photo         String?
+  color         String   // Cor identificadora do usuário
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relações
+  householdId   String?  @db.ObjectId
+  household     Household? @relation(fields: [householdId], references: [id])
+  
+  // Renda do usuário
+  incomes       Income[]
+  
+  // Gastos individuais
+  individualExpenses Expense[] @relation("IndividualExpenses")
+  
+  // Gastos do casal criados por este usuário
+  coupleExpenses     Expense[] @relation("CoupleExpenseCreator")
+  
+  // Tarefas domésticas
+  tasks         Task[]
+  
+  // Cartões de crédito
+  creditCards   CreditCard[]
+  
+  // Notificações
+  notifications Notification[]
+  
+  // Mensagens da IA
+  aiMessages    AIMessage[]
+  
+  @@map("users")
+}
+
+// ==================== CASA FINANCEIRA ====================
+
+model Household {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  name            String   // Nome da casa (ex: "Casa João & Maria")
+  inviteCode      String   @unique // Código de convite
+  splitMethod     SplitMethod @default(FIFTY_FIFTY)
+  customSplit     CustomSplit? // Para divisões customizadas
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isActive        Boolean  @default(true)
+  
+  // Relações
+  members         User[]
+  incomes         Income[]
+  expenses        Expense[]
+  tasks           Task[]
+  budgets         Budget[]
+  goals           Goal[]
+  dreams          Dream[]
+  shoppingLists   ShoppingList[]
+  bills           Bill[]
+  notifications   Notification[]
+  equityReports   EquityReport[]
+  
+  @@map("households")
+}
+
+type CustomSplit {
+  user1Percentage Float // Ex: 70
+  user2Percentage Float // Ex: 30
+}
+
+enum SplitMethod {
+  FIFTY_FIFTY           // 50/50
+  CUSTOM               // 70/30, 40/60, etc
+  PROPORTIONAL         // Proporcional à renda
+  ONE_PAYS             // Apenas um paga
+  NO_SPLIT             // Não separa o dinheiro
+}
+
+// ==================== RENDA ====================
+
+model Income {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId String   @db.ObjectId
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  source      String   // Nome da fonte (ex: "Salário CLT", "Freelancer")
+  amount      Float
+  type        IncomeType
+  frequency   Frequency
+  
+  // Datas
+  receivedAt  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Recorrência
+  isRecurring Boolean  @default(false)
+  
+  @@map("incomes")
+}
+
+enum IncomeType {
+  SALARY
+  FREELANCE
+  INVESTMENT
+  BUSINESS
+  OTHER
+}
+
+enum Frequency {
+  ONCE
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  YEARLY
+}
+
+// ==================== DESPESAS ====================
+
+model Expense {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId   String   @db.ObjectId
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  createdById   String   @db.ObjectId
+  createdBy     User     @relation("CoupleExpenseCreator", fields: [createdById], references: [id])
+  
+  // Gasto individual ou do casal
+  isIndividual  Boolean  @default(false)
+  individualUserId String? @db.ObjectId
+  individualUser   User?   @relation("IndividualExpenses", fields: [individualUserId], references: [id])
+  
+  // Detalhes da despesa
+  description   String
+  amount        Float
+  category      ExpenseCategory
+  date          DateTime
+  
+  // Pagamento
+  paymentMethod PaymentMethod
+  creditCardId  String?  @db.ObjectId
+  creditCard    CreditCard? @relation(fields: [creditCardId], references: [id])
+  
+  // Parcelamento
+  isInstallment Boolean  @default(false)
+  installments  Installment[]
+  totalInstallments Int?
+  currentInstallment Int?
+  
+  // Notificação
+  notifyPartner Boolean  @default(true)
+  
+  // Comprovante
+  receipt       String?  // URL do comprovante
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("expenses")
+}
+
+enum ExpenseCategory {
+  GROCERIES       // Mercado
+  TRANSPORT       // Transporte
+  LEISURE         // Lazer
+  PETS            // Pets
+  HEALTH          // Saúde
+  HOME            // Casa
+  SUBSCRIPTIONS   // Assinaturas
+  EDUCATION       // Educação
+  CLOTHING        // Vestuário
+  RESTAURANTS     // Restaurantes
+  BILLS           // Contas fixas
+  OTHER           // Outros
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  CASH
+  PIX
+  BANK_TRANSFER
+  OTHER
+}
+
+// ==================== PARCELAS ====================
+
+model Installment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  expenseId   String   @db.ObjectId
+  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  
+  number      Int      // Número da parcela (1, 2, 3...)
+  amount      Float
+  dueDate     DateTime
+  isPaid      Boolean  @default(false)
+  paidAt      DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("installments")
+}
+
+// ==================== CARTÕES DE CRÉDITO ====================
+
+model CreditCard {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name          String   // Nome customizado (ex: "Nubank Roxo")
+  lastDigits    String   // Últimos 4 dígitos
+  brand         CardBrand
+  
+  limit         Float
+  closingDay    Int      // Dia do fechamento (1-31)
+  dueDay        Int      // Dia do vencimento (1-31)
+  
+  color         String?  // Cor para identificação visual
+  
+  expenses      Expense[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  isActive      Boolean  @default(true)
+  
+  @@map("credit_cards")
+}
+
+enum CardBrand {
+  VISA
+  MASTERCARD
+  ELO
+  AMEX
+  HIPERCARD
+  OTHER
+}
+
+// ==================== TAREFAS DOMÉSTICAS ====================
+
+model Task {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId   String   @db.ObjectId
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name          String   // Ex: "Lavar louça"
+  type          TaskType
+  weight        TaskWeight
+  
+  completedAt   DateTime
+  createdAt     DateTime @default(now())
+  
+  // Recorrência
+  isRecurring   Boolean  @default(false)
+  frequency     Frequency?
+  
+  @@map("tasks")
+}
+
+enum TaskType {
+  DISHES          // Lavar louça
+  COOKING         // Fazer comida
+  CLEANING        // Limpar casa
+  LAUNDRY         // Lavar roupa
+  PET_CARE        // Cuidar do pet
+  GROCERY         // Fazer compras
+  ORGANIZING      // Organizar
+  MAINTENANCE     // Manutenção
+  OTHER           // Outros
+}
+
+enum TaskWeight {
+  LIGHT    // Leve (1 ponto)
+  MEDIUM   // Médio (2 pontos)
+  HEAVY    // Pesado (3 pontos)
+}
+
+// ==================== EQUIDADE ====================
+
+model EquityReport {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId   String   @db.ObjectId
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  // Período do relatório
+  month         Int
+  year          Int
+  
+  // Snapshot dos usuários (para histórico fiel)
+  user1Snapshot UserSnapshot
+  user2Snapshot UserSnapshot
+  
+  // Equidade financeira
+  financialEquity FinancialEquity
+  
+  // Equidade doméstica
+  domesticEquity  DomesticEquity
+  
+  // Equidade geral (combinada)
+  overallEquity Float
+  
+  createdAt     DateTime @default(now())
+  
+  @@unique([householdId, month, year])
+  @@map("equity_reports")
+}
+
+type UserSnapshot {
+  userId    String
+  name      String
+  photo     String?
+  color     String
+}
+
+type FinancialEquity {
+  user1Id         String
+  user1Paid       Float
+  user1Should     Float
+  user1Balance    Float  // Positivo = pagou a mais, Negativo = deve
+  
+  user2Id         String
+  user2Paid       Float
+  user2Should     Float
+  user2Balance    Float
+  
+  totalExpenses   Float
+}
+
+type DomesticEquity {
+  user1Id         String
+  user1Points     Int
+  user1Percentage Float
+  
+  user2Id         String
+  user2Points     Int
+  user2Percentage Float
+  
+  totalPoints     Int
+}
+
+// ==================== ORÇAMENTOS ====================
+
+model Budget {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId   String   @db.ObjectId
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  category      ExpenseCategory
+  amount        Float    // Limite definido
+  
+  // Período
+  month         Int
+  year          Int
+  
+  // Acompanhamento
+  spent         Float    @default(0)
+  percentage    Float    @default(0)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([householdId, category, month, year])
+  @@map("budgets")
+}
+
+// ==================== METAS ====================
+
+model Goal {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId   String   @db.ObjectId
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  name          String   // Ex: "Economizar R$ 500 por mês"
+  description   String?
+  targetAmount  Float
+  currentAmount Float    @default(0)
+  
+  type          GoalType
+  
+  // Datas
+  startDate     DateTime
+  targetDate    DateTime
+  completedAt   DateTime?
+  
+  // Status
+  status        GoalStatus @default(IN_PROGRESS)
+  
+  // Histórico de aportes
+  contributions Contribution[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("goals")
+}
+
+enum GoalType {
+  MONTHLY    // Meta mensal
+  ANNUAL     // Meta anual
+  CUSTOM     // Meta customizada
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+  CANCELLED
+}
+
+// ==================== SONHOS ====================
+
+model Dream {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId   String   @db.ObjectId
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  name          String   // Ex: "Viagem para Paris"
+  description   String?
+  imageUrl      String?  // Imagem motivacional
+  
+  targetAmount  Float
+  currentAmount Float    @default(0)
+  
+  // Datas
+  targetDate    DateTime?
+  completedAt   DateTime?
+  
+  // Status
+  status        DreamStatus @default(IN_PROGRESS)
+  priority      Priority   @default(MEDIUM)
+  
+  // Histórico de aportes
+  contributions Contribution[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("dreams")
+}
+
+enum DreamStatus {
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ==================== CONTRIBUIÇÕES (METAS E SONHOS) ====================
+
+model Contribution {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  
+  goalId      String?  @db.ObjectId
+  goal        Goal?    @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  
+  dreamId     String?  @db.ObjectId
+  dream       Dream?   @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+  
+  amount      Float
+  date        DateTime
+  note        String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("contributions")
+}
+
+// ==================== LISTA DE COMPRAS ====================
+
+model ShoppingList {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId   String   @db.ObjectId
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  name          String   // Ex: "Mercado do mês"
+  category      ShoppingCategory
+  
+  items         ShoppingItem[]
+  totalAmount   Float    @default(0)
+  
+  // Status
+  isCompleted   Boolean  @default(false)
+  completedAt   DateTime?
+  
+  // Favorita para reutilizar
+  isFavorite    Boolean  @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("shopping_lists")
+}
+
+type ShoppingItem {
+  name        String
+  quantity    Float
+  unit        String   // Ex: "kg", "un", "L"
+  price       Float
+  isChecked   Boolean  @default(false)
+}
+
+enum ShoppingCategory {
+  GROCERIES
+  PHARMACY
+  HOUSEHOLD
+  PET
+  OTHER
+}
+
+// ==================== CONTAS E AGENDA ====================
+
+model Bill {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId   String   @db.ObjectId
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  name          String   // Ex: "Conta de luz"
+  description   String?
+  
+  amount        Float?   // Pode variar
+  dueDay        Int      // Dia do vencimento
+  
+  category      BillCategory
+  
+  // Recorrência
+  isRecurring   Boolean  @default(true)
+  frequency     Frequency @default(MONTHLY)
+  
+  // Lembretes
+  reminderDays  Int      @default(3) // Avisar X dias antes
+  
+  // Pagamentos
+  payments      BillPayment[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  isActive      Boolean  @default(true)
+  
+  @@map("bills")
+}
+
+enum BillCategory {
+  UTILITIES     // Água, luz, gás
+  INTERNET
+  PHONE
+  RENT
+  SUBSCRIPTION  // Netflix, Spotify, etc
+  INSURANCE
+  OTHER
+}
+
+model BillPayment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  billId      String   @db.ObjectId
+  bill        Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  
+  amount      Float
+  dueDate     DateTime
+  paidDate    DateTime?
+  isPaid      Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("bill_payments")
+}
+
+// ==================== NOTIFICAÇÕES ====================
+
+model Notification {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId String   @db.ObjectId
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title       String
+  message     String
+  type        NotificationType
+  
+  // Dados relacionados
+  relatedId   String?  // ID da entidade relacionada
+  relatedType RelatedEntityType?
+  
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("notifications")
+}
+
+enum RelatedEntityType {
+  EXPENSE
+  GOAL
+  DREAM
+  BILL
+  TASK
+  BUDGET
+  INCOME
+  CREDIT_CARD
+  SHOPPING_LIST
+  OTHER
+}
+
+enum NotificationType {
+  EXPENSE_ADDED
+  BUDGET_WARNING      // 80% do orçamento
+  BUDGET_EXCEEDED
+  GOAL_PROGRESS
+  GOAL_ACHIEVED
+  DREAM_PROGRESS
+  BILL_DUE
+  TASK_IMBALANCE     // Desequilíbrio nas tarefas
+  PARTNER_EXPENSE    // Parceiro adicionou gasto
+  AI_INSIGHT         // Insight da IA
+  POSITIVE_MESSAGE   // Mensagem positiva
+}
+
+// ==================== IA E MENSAGENS ====================
+
+model AIMessage {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  message     String
+  type        AIMessageType
+  tone        AITone
+  
+  // Contexto
+  context     Json?    // Dados que geraram a mensagem
+  
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("ai_messages")
+}
+
+enum AIMessageType {
+  INSIGHT         // Insight financeiro
+  PREDICTION      // Previsão
+  SUGGESTION      // Sugestão de economia
+  WARNING         // Aviso de risco
+  PEACE_MODE      // Mensagem do Modo Paz
+  POSITIVE        // Mensagem positiva
+  TASK_BALANCE    // Equilíbrio de tarefas
+}
+
+enum AITone {
+  NEUTRAL
+  ENCOURAGING
+  CAUTIOUS
+  CELEBRATORY
+  GENTLE         // Para Modo Paz
+}
+
+// ==================== CONFIGURAÇÕES E PREFERÊNCIAS ====================
+
+model Settings {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  householdId     String   @unique @db.ObjectId
+  
+  // Notificações
+  notifyBudgetAt  Int      @default(80) // % para avisar
+  notifyBillDays  Int      @default(3)  // Dias antes de vencer
+  
+  // IA
+  aiEnabled       Boolean  @default(true)
+  peaceModeEnabled Boolean @default(true)
+  
+  // Moeda
+  currency        String   @default("BRL")
+  
+  // Tema
+  theme           String   @default("light")
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("settings")
+}
+
+// ==================== ÍNDICES PARA PERFORMANCE ====================
+
+// Os índices abaixo são importantes para queries frequentes:
+// - expenses: householdId, date, category, createdById
+// - incomes: userId, receivedAt
+// - tasks: userId, completedAt
+// - budgets: householdId, month, year
+// - goals/dreams: householdId, status
+// - notifications: userId, isRead, createdAt
