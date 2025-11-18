@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
-import { PrismaService } from './prisma/prisma.service';
 import { Logger } from 'nestjs-pino';
 
 async function bootstrap() {

@@ -34,7 +34,8 @@ model User {
   
   // Gastos do casal criados por este usuário
   coupleExpenses     Expense[] @relation("CoupleExpenseCreator")
-  
+  domesticTaskEntries DomesticTaskEntry[]
+
   // Tarefas domésticas
   tasks         Task[]
   
@@ -54,19 +55,23 @@ model User {
 
 model Household {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  name            String   // Nome da casa (ex: "Casa João & Maria")
-  inviteCode      String   @unique // Código de convite
+  name            String
+  inviteCode      String   @unique
   splitMethod     SplitMethod @default(FIFTY_FIFTY)
-  customSplit     CustomSplit? // Para divisões customizadas
+  customSplit     CustomSplit?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   isActive        Boolean  @default(true)
-  
-  // Relações
+
   members         User[]
   incomes         Income[]
   expenses        Expense[]
-  tasks           Task[]
+
+  // DOMÉSTICO ← (ADICIONE ISSO)
+  taskTemplates      TaskTemplate[]
+  domesticTaskEntries DomesticTaskEntry[]
+
+  tasks           Task[]       // ← LEMBRE DE APAGAR ESSE MODELO ANTIGO DEPOIS
   budgets         Budget[]
   goals           Goal[]
   dreams          Dream[]
@@ -74,9 +79,10 @@ model Household {
   bills           Bill[]
   notifications   Notification[]
   equityReports   EquityReport[]
-  
+
   @@map("households")
 }
+
 
 type CustomSplit {
   user1Percentage Float // Ex: 70
@@ -280,15 +286,15 @@ model Task {
 }
 
 enum TaskType {
-  DISHES          // Lavar louça
-  COOKING         // Fazer comida
-  CLEANING        // Limpar casa
-  LAUNDRY         // Lavar roupa
-  PET_CARE        // Cuidar do pet
-  GROCERY         // Fazer compras
-  ORGANIZING      // Organizar
-  MAINTENANCE     // Manutenção
-  OTHER           // Outros
+  DISHES
+  COOKING
+  CLEANING
+  LAUNDRY
+  PET_CARE
+  GROCERY
+  ORGANIZING
+  MAINTENANCE
+  OTHER
 }
 
 enum TaskWeight {
@@ -712,6 +718,52 @@ model Settings {
   
   @@map("settings")
 }
+
+model TaskTemplate {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  householdId   String?  @db.ObjectId
+  household     Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  name          String
+  description   String?
+  type          TaskType
+  weight        TaskWeight  // LIGHT / MEDIUM / HEAVY
+
+  isBuiltIn     Boolean @default(false)  // true = tarefa padrão universal
+  isActive      Boolean @default(true)
+
+  // execuções dessa tarefa
+  entries       DomesticTaskEntry[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("task_templates")
+}
+
+model DomesticTaskEntry {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  householdId  String   @db.ObjectId
+  household    Household @relation(fields: [householdId], references: [id])
+
+  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id])
+
+  templateId   String   @db.ObjectId
+  template     TaskTemplate @relation(fields: [templateId], references: [id])
+
+  completedAt  DateTime
+  hours        Float?
+  note         String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("domestic_task_entries")
+}
+
 
 // ==================== ÍNDICES PARA PERFORMANCE ====================
 

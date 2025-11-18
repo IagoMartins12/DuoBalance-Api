@@ -7,6 +7,13 @@ import { UsersModule } from './users/users.module';
 import { HouseholdsModule } from './households/households.module';
 import { IncomesModule } from './incomes/incomes.module';
 import { LoggerModule } from './common/logger/logger.module';
+import { ExpensesModule } from './expenses/expenses.module';
+import { RecurringJobsService } from './recurring-jobs/recurring-jobs.service';
+import { SplitService } from './split/split.service';
+import { EquityModule } from './equity/equity.module';
+import { TaskTemplateModule } from './task-template/task-template.module';
+import { DomesticTaskEntryModule } from './domestic-task-entry/domestic-task-entry.module';
+import { DomesticEquityModule } from './domestic-equity/domestic-equity.module';
 
 @Module({
   imports: [
@@ -26,6 +33,12 @@ import { LoggerModule } from './common/logger/logger.module';
     HouseholdsModule,
     IncomesModule,
     LoggerModule,
+    ExpensesModule,
+    EquityModule,
+    TaskTemplateModule,
+    DomesticTaskEntryModule,
+    DomesticEquityModule,
   ],
+  providers: [RecurringJobsService, SplitService],
 })
 export class AppModule {}

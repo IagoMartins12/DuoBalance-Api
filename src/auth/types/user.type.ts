@@ -5,11 +5,3 @@ export interface AuthUser {
   photo: string | null;
   color: string;
 }
-
-export interface UserFromJwt {
-  id: string;
-  email: string;
-  name: string;
-  photo: string | null;
-  color: string;
-}
