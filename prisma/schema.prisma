@@ -18,7 +18,7 @@ model User {
   password      String
   name          String
   photo         String?
-  color         String   // Cor identificadora do usuário
+  color         String?   @default("#FFFFFF")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -409,7 +409,8 @@ model Goal {
   startDate     DateTime
   targetDate    DateTime
   completedAt   DateTime?
-  
+  imageUrl      String?  // <--- ADICIONADO
+
   // Status
   status        GoalStatus @default(IN_PROGRESS)
   
@@ -420,6 +421,7 @@ model Goal {
   updatedAt     DateTime @updatedAt
   
   @@map("goals")
+  goalHistories GoalHistory[]
 }
 
 enum GoalType {
@@ -433,6 +435,7 @@ enum GoalStatus {
   COMPLETED
   DELAYED
   CANCELLED
+  NEAR_COMPLETION
 }
 
 // ==================== SONHOS ====================
@@ -511,7 +514,9 @@ model ShoppingList {
   category      ShoppingCategory
   
   items         ShoppingItem[]
-  totalAmount   Float    @default(0)
+  expectedTotal Float    @default(0)
+  realTotal     Float    @default(0)
+  isOverBudget  Boolean  @default(false)
   
   // Status
   isCompleted   Boolean  @default(false)
@@ -527,11 +532,13 @@ model ShoppingList {
 }
 
 type ShoppingItem {
-  name        String
-  quantity    Float
-  unit        String   // Ex: "kg", "un", "L"
-  price       Float
-  isChecked   Boolean  @default(false)
+  name          String
+  quantity      Float
+  unit          String   // Ex: "kg", "un", "L"
+  expectedPrice Float
+  realPrice     Float    @default(0)
+  isChecked     Boolean  @default(false)
+  productId     String?
 }
 
 enum ShoppingCategory {
@@ -541,7 +548,6 @@ enum ShoppingCategory {
   PET
   OTHER
 }
-
 // ==================== CONTAS E AGENDA ====================
 
 model Bill {
@@ -607,16 +613,16 @@ model Notification {
   householdId String   @db.ObjectId
   household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
   
-  userId      String   @db.ObjectId
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String?   @db.ObjectId
+  user        User?     @relation(fields: [userId], references: [id])
   
   title       String
   message     String
   type        NotificationType
   
   // Dados relacionados
-  relatedId   String?  // ID da entidade relacionada
-  relatedType RelatedEntityType?
+  relatedId   String?  @db.ObjectId
+  relatedType NotificationEntity?
   
   isRead      Boolean  @default(false)
   readAt      DateTime?
@@ -626,31 +632,33 @@ model Notification {
   @@map("notifications")
 }
 
-enum RelatedEntityType {
-  EXPENSE
-  GOAL
-  DREAM
-  BILL
-  TASK
+enum NotificationEntity {
   BUDGET
-  INCOME
+  EXPENSE
+  TASK
+  EQUITY
+  DREAM
+  GOAL
   CREDIT_CARD
-  SHOPPING_LIST
+  BILL
+  AI_MESSAGE
+  HOUSEHOLD
   OTHER
 }
 
 enum NotificationType {
+  BUDGET_WARNING
+  BUDGET_CRITICAL
+  TASK_COMPLETED
+  TASK_DELAYED
   EXPENSE_ADDED
-  BUDGET_WARNING      // 80% do orçamento
-  BUDGET_EXCEEDED
-  GOAL_PROGRESS
-  GOAL_ACHIEVED
-  DREAM_PROGRESS
+  DREAM_UPDATED
+  GOAL_UPDATED
   BILL_DUE
-  TASK_IMBALANCE     // Desequilíbrio nas tarefas
-  PARTNER_EXPENSE    // Parceiro adicionou gasto
-  AI_INSIGHT         // Insight da IA
-  POSITIVE_MESSAGE   // Mensagem positiva
+  CREDIT_CARD_CLOSED
+  CREDIT_CARD_NEW_PURCHASE
+  AI_INSIGHT
+  GENERAL
 }
 
 // ==================== IA E MENSAGENS ====================
@@ -764,6 +772,25 @@ model DomesticTaskEntry {
   @@map("domestic_task_entries")
 }
 
+model GoalHistory {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  
+  goalId        String   @db.ObjectId
+  goal          Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  householdId   String   @db.ObjectId
+
+  month         Int
+  year          Int
+
+  amount        Float    // quanto a meta acumulou naquele mês
+  percentage    Float    // porcentagem daquele mês
+
+  createdAt     DateTime @default(now())
+
+  @@unique([goalId, month, year])
+  @@map("goal_history")
+}
 
 // ==================== ÍNDICES PARA PERFORMANCE ====================
 

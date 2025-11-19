@@ -13,30 +13,47 @@ import { ExpenseCategory, PaymentMethod } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateExpenseDto {
-  @ApiProperty({ example: 'Mercado do mês' })
+  @ApiProperty({
+    example: 'Mercado do mês',
+    description: 'Descrição da despesa.',
+  })
   @IsString()
   @IsNotEmpty()
   description: string;
 
-  @ApiProperty({ example: 350.75 })
+  @ApiProperty({
+    example: 350.75,
+    description: 'Valor da despesa.',
+  })
   @IsNumber()
   @IsPositive()
   amount: number;
 
-  @ApiProperty({ enum: ExpenseCategory, example: ExpenseCategory.GROCERIES })
+  @ApiProperty({
+    enum: ExpenseCategory,
+    example: ExpenseCategory.GROCERIES,
+    description: 'Categoria da despesa.',
+  })
   @IsEnum(ExpenseCategory)
   category: ExpenseCategory;
 
-  @ApiProperty({ example: '2025-11-17T00:00:00.000Z' })
+  @ApiProperty({
+    example: '2025-11-17T00:00:00.000Z',
+    description: 'Data em que a despesa ocorreu (ISO 8601).',
+  })
   @IsDateString()
   date: string;
 
-  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.CREDIT_CARD })
+  @ApiProperty({
+    enum: PaymentMethod,
+    example: PaymentMethod.CREDIT_CARD,
+    description: 'Método de pagamento utilizado.',
+  })
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;
 
   @ApiPropertyOptional({
-    description: 'Obrigatório se paymentMethod = CREDIT_CARD',
+    description: 'Obrigatório se paymentMethod = CREDIT_CARD.',
     example: '675f8a3bbd0b5d3a9c0f1234',
   })
   @IsOptional()
@@ -44,7 +61,7 @@ export class CreateExpenseDto {
   creditCardId?: string;
 
   @ApiPropertyOptional({
-    description: 'Se true, despesa é individual do usuário logado',
+    description: 'Se true, a despesa é individual do usuário logado.',
     default: false,
   })
   @IsOptional()
@@ -53,7 +70,7 @@ export class CreateExpenseDto {
 
   @ApiPropertyOptional({
     description:
-      'Se true, cria parcelas automaticamente (Installments) para esta despesa',
+      'Se true, cria parcelas automaticamente (Installments) para esta despesa.',
     default: false,
   })
   @IsOptional()
@@ -62,7 +79,7 @@ export class CreateExpenseDto {
 
   @ApiPropertyOptional({
     description:
-      'Número total de parcelas (obrigatório se isInstallment = true)',
+      'Número total de parcelas (obrigatório se isInstallment = true).',
     example: 6,
   })
   @IsOptional()
@@ -72,7 +89,7 @@ export class CreateExpenseDto {
 
   @ApiPropertyOptional({
     description:
-      'Data de vencimento da primeira parcela (obrigatório se isInstallment = true)',
+      'Data de vencimento da primeira parcela (obrigatório se isInstallment = true).',
     example: '2025-12-10T00:00:00.000Z',
   })
   @IsOptional()

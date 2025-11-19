@@ -202,7 +202,7 @@ export class IncomesService {
           userId: inc.userId,
           name: inc.user.name,
           email: inc.user.email,
-          color: inc.user.color,
+          color: inc.user.color ?? '#FFFFFF',
           totalAmount: inc.amount,
         });
       } else {
